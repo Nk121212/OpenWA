@@ -86,7 +86,22 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
         this.logger.log(
           `Using proxy: ${this.config.proxy.type}://${this.config.proxy.url.replace(/:[^:@]*@/, ':***@')}`,
         );
+      } else {
+        // Ensure no local proxy interferes with the connection
+        if (!puppeteerArgs.includes('--no-proxy-server')) {
+          puppeteerArgs.push('--no-proxy-server');
+        }
       }
+
+      // Add extra robust flags for containerized environments
+      const extraArgs = [
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--disable-site-isolation-trials',
+        '--disable-web-security'
+      ];
+      extraArgs.forEach(arg => {
+        if (!puppeteerArgs.includes(arg)) puppeteerArgs.push(arg);
+      });
 
       this.client = new Client({
         authStrategy: new LocalAuth({
@@ -96,7 +111,9 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
         puppeteer: {
           headless: this.config.puppeteer?.headless ?? true,
           args: puppeteerArgs,
-        },
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+          timeout: 60000, // Increase timeout
+        } as any,
       });
 
       this.setupEventHandlers();
